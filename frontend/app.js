@@ -14,7 +14,7 @@
 // For local development, use http://localhost:8000.
 // For production, replace with your Render service URL, e.g.:
 //   const API_BASE_URL = "https://your-service-name.onrender.com";
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "https://dhruvgpt.onrender.com";
 
 // ── State ──────────────────────────────────────────────────────────────────
 let currentConversationId = null;
