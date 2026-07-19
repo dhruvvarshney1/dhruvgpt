@@ -32,11 +32,25 @@ from app.nvidia_client import (
 )
 from app.schemas import ChatRequest
 
+from pathlib import Path
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
-SYSTEM_PROMPT = "You are a helpful assistant."
+SYSTEM_PROMPT_PATH = Path(__file__).parent.parent.parent / "system.md"
+
+
+def get_system_prompt() -> str:
+    """Load system prompt from system.md if present, fallback to default."""
+    if SYSTEM_PROMPT_PATH.is_file():
+        try:
+            content = SYSTEM_PROMPT_PATH.read_text(encoding="utf-8").strip()
+            if content:
+                return content
+        except Exception as exc:
+            logger.warning("Failed to read system.md: %s", exc)
+    return "You are a helpful assistant."
 
 
 def _sse(event: str, data: str) -> str:
@@ -93,7 +107,7 @@ async def chat(
     # Reload conversation with messages to include the one we just added
     conversation = await crud.get_conversation(db, conversation_id)
     nvidia_messages: list[dict[str, str]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": get_system_prompt()},
     ]
     if conversation and conversation.messages:
         for msg in conversation.messages:
