@@ -266,12 +266,17 @@ body {
     background: var(--user-bubble);
     color: hsl(217, 80%, 90%);
     border-bottom-right-radius: var(--radius-sm);
+    white-space: pre-wrap;
 }
 
 .message-row.assistant .message-bubble {
     background: var(--assistant-bubble);
     border: 1px solid var(--border);
     border-bottom-left-radius: var(--radius-sm);
+}
+
+.streaming-cursor {
+    white-space: pre-wrap;
 }
 
 /* Markdown inside assistant bubbles */
@@ -291,6 +296,7 @@ body {
     padding: 12px 14px;
     overflow-x: auto;
     margin: 8px 0;
+    white-space: pre;
 }
 .message-bubble pre code {
     background: none;
