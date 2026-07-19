@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     database_url: str  # required — async driver, e.g. postgresql+asyncpg://...
 
     # ── CORS ────────────────────────────────────────────────────────────
-    cors_allowed_origins: list[str] = [
+    cors_allowed_origins: str | list[str] = [
         "http://localhost:8000",
         "http://127.0.0.1:5500",
     ]
@@ -53,8 +53,8 @@ class Settings(BaseSettings):
                 try:
                     return json.loads(v_str)
                 except Exception:
-                    pass
-            return [i.strip() for i in v_str.split(",") if i.strip()]
+                    v_str = v_str[1:-1].strip()
+            return [i.strip(" '\"`") for i in v_str.split(",") if i.strip(" '\"`")]
         return v
 
     # ── General ─────────────────────────────────────────────────────────
