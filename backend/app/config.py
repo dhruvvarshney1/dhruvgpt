@@ -5,6 +5,9 @@ locally). Required settings with no default will cause a startup crash if
 missing — this is intentional.
 """
 
+import json
+from typing import Any
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,8 +42,24 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5500",
     ]
 
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def assemble_cors_origins(cls, v: Any) -> list[str] | Any:
+        if isinstance(v, str):
+            v_str = v.strip()
+            if not v_str:
+                return []
+            if v_str.startswith("[") and v_str.endswith("]"):
+                try:
+                    return json.loads(v_str)
+                except Exception:
+                    pass
+            return [i.strip() for i in v_str.split(",") if i.strip()]
+        return v
+
     # ── General ─────────────────────────────────────────────────────────
     environment: str = "development"
 
 
 settings = Settings()  # type: ignore[call-arg]
+
