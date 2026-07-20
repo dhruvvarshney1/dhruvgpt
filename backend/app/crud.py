@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import populate_existing, selectinload
 
 from app.models import Conversation, Message
 
@@ -35,9 +35,22 @@ async def get_conversation(
     result = await db.execute(
         select(Conversation)
         .where(Conversation.id == conversation_id)
-        .options(selectinload(Conversation.messages))
+        .options(populate_existing(), selectinload(Conversation.messages))
     )
     return result.scalar_one_or_none()
+
+
+async def get_conversation_messages(
+    db: AsyncSession,
+    conversation_id: uuid.UUID,
+) -> list[Message]:
+    """Return all messages for a conversation ordered chronologically."""
+    result = await db.execute(
+        select(Message)
+        .where(Message.conversation_id == conversation_id)
+        .order_by(Message.created_at.asc())
+    )
+    return list(result.scalars().all())
 
 
 async def list_conversations(db: AsyncSession) -> list[Conversation]:

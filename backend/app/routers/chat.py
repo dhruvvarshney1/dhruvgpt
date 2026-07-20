@@ -110,14 +110,13 @@ async def chat(
     await crud.add_message(db, conversation_id, role="user", content=request.message)
 
     # ── Build the messages list for NVIDIA ────────────────────────────
-    # Reload conversation with messages to include the one we just added
-    conversation = await crud.get_conversation(db, conversation_id)
+    # Fetch all messages directly from DB to guarantee the latest user message is included
+    history_messages = await crud.get_conversation_messages(db, conversation_id)
     nvidia_messages: list[dict[str, str]] = [
         {"role": "system", "content": get_system_prompt()},
     ]
-    if conversation and conversation.messages:
-        for msg in conversation.messages:
-            nvidia_messages.append({"role": msg.role, "content": msg.content})
+    for msg in history_messages:
+        nvidia_messages.append({"role": msg.role, "content": msg.content})
 
     # ── SSE generator ─────────────────────────────────────────────────
     async def event_generator():
