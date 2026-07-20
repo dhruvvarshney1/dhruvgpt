@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import populate_existing, selectinload
+from sqlalchemy.orm import selectinload
 
 from app.models import Conversation, Message
 
@@ -35,7 +35,8 @@ async def get_conversation(
     result = await db.execute(
         select(Conversation)
         .where(Conversation.id == conversation_id)
-        .options(populate_existing(), selectinload(Conversation.messages))
+        .options(selectinload(Conversation.messages))
+        .execution_options(populate_existing=True)
     )
     return result.scalar_one_or_none()
 
