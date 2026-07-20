@@ -30,10 +30,10 @@ class Settings(BaseSettings):
     nvidia_api_base_url: str = "https://integrate.api.nvidia.com/v1"
     nvidia_model: str = "meta/llama-3.1-8b-instruct"
     available_models: str | list[str] = [
-        "meta/llama-3.1-8b-instruct",
-        "meta/llama-3.1-70b-instruct",
+        "nvidia/nemotron-3-ultra-550b-a55b",
         "meta/llama-3.3-70b-instruct",
-        "deepseek-ai/deepseek-r1-distill-llama-70b",
+        "deepseek-ai/deepseek-v4-flash",
+        "deepseek-ai/deepseek-v4-pro",
     ]
     nvidia_temperature: float = 0.7
     nvidia_max_tokens: int = 1024
