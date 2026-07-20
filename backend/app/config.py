@@ -36,7 +36,7 @@ class Settings(BaseSettings):
         "deepseek-ai/deepseek-v4-pro",
     ]
     nvidia_temperature: float = 0.7
-    nvidia_max_tokens: int = 1024
+    nvidia_max_tokens: int = 4096
     nvidia_request_timeout_seconds: int = 300
 
     # ── Database ────────────────────────────────────────────────────────
