@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session_factory
 
 from app import crud
+from app.config import settings
 from app.database import get_db
 from app.nvidia_client import (
     NvidiaAPIError,

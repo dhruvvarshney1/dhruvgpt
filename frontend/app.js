@@ -85,22 +85,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ── Load available models ──────────────────────────────────────────────────
 async function loadModels() {
+    const defaultModels = [
+        "meta/llama-3.1-8b-instruct",
+        "meta/llama-3.1-70b-instruct",
+        "meta/llama-3.3-70b-instruct",
+        "deepseek-ai/deepseek-r1-distill-llama-70b",
+    ];
+
+    let models = defaultModels;
     try {
         const res = await fetch(`${API_BASE_URL}/models`);
-        if (!res.ok) return;
-        const models = await res.json();
-        if (models && models.length > 0) {
-            modelSelect.innerHTML = models
-                .map((m) => `<option value="${m}">${m}</option>`)
-                .join("");
-
-            const saved = localStorage.getItem("selected_model");
-            if (saved && modelSelect.querySelector(`option[value="${saved}"]`)) {
-                modelSelect.value = saved;
+        if (res.ok) {
+            const fetched = await res.json();
+            if (Array.isArray(fetched) && fetched.length > 0) {
+                models = fetched;
             }
         }
     } catch (err) {
         console.error("Failed to load models:", err);
+    }
+
+    modelSelect.innerHTML = models
+        .map((m) => `<option value="${m}">${m}</option>`)
+        .join("");
+
+    const saved = localStorage.getItem("selected_model");
+    if (saved && modelSelect.querySelector(`option[value="${saved}"]`)) {
+        modelSelect.value = saved;
     }
 }
 
