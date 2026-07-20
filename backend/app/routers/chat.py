@@ -36,9 +36,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["chat"])
+@router.get("/models")
+async def get_models() -> list[str]:
+    """Return available models configured in backend settings."""
+    if isinstance(settings.available_models, list):
+        return settings.available_models
+    return [settings.nvidia_model]
 
-SYSTEM_PROMPT_PATH = Path(__file__).parent.parent.parent / "system.md"
+
+@router.post("/chat")
 
 
 def get_system_prompt() -> str:

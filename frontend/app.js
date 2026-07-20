@@ -52,12 +52,8 @@ const modelSelect      = document.getElementById("model-select");
 // ── Initialise ─────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
     loadConversations();
+    loadModels();
 
-    // ponytail: restore selected model from localStorage
-    const saved = localStorage.getItem("selected_model");
-    if (saved && modelSelect.querySelector(`option[value="${saved}"]`)) {
-        modelSelect.value = saved;
-    }
     modelSelect.addEventListener("change", () => {
         localStorage.setItem("selected_model", modelSelect.value);
     });
@@ -86,6 +82,27 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
+
+// ── Load available models ──────────────────────────────────────────────────
+async function loadModels() {
+    try {
+        const res = await fetch(`${API_BASE_URL}/models`);
+        if (!res.ok) return;
+        const models = await res.json();
+        if (models && models.length > 0) {
+            modelSelect.innerHTML = models
+                .map((m) => `<option value="${m}">${m}</option>`)
+                .join("");
+
+            const saved = localStorage.getItem("selected_model");
+            if (saved && modelSelect.querySelector(`option[value="${saved}"]`)) {
+                modelSelect.value = saved;
+            }
+        }
+    } catch (err) {
+        console.error("Failed to load models:", err);
+    }
+}
 
 // ── Sidebar: load conversations ────────────────────────────────────────────
 async function loadConversations() {

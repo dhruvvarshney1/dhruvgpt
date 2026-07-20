@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     nvidia_api_key: str  # required — no default
     nvidia_api_base_url: str = "https://integrate.api.nvidia.com/v1"
     nvidia_model: str = "meta/llama-3.1-8b-instruct"
+    available_models: str | list[str] = [
+        "meta/llama-3.1-8b-instruct",
+        "meta/llama-3.1-70b-instruct",
+        "meta/llama-3.3-70b-instruct",
+        "deepseek-ai/deepseek-r1-distill-llama-70b",
+    ]
     nvidia_temperature: float = 0.7
     nvidia_max_tokens: int = 1024
     nvidia_request_timeout_seconds: int = 60
@@ -42,9 +48,9 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5500",
     ]
 
-    @field_validator("cors_allowed_origins", mode="before")
+    @field_validator("cors_allowed_origins", "available_models", mode="before")
     @classmethod
-    def assemble_cors_origins(cls, v: Any) -> list[str] | Any:
+    def assemble_list_origins(cls, v: Any) -> list[str] | Any:
         if isinstance(v, str):
             v_str = v.strip()
             if not v_str:
