@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     ]
     nvidia_temperature: float = 0.7
     nvidia_max_tokens: int = 1024
-    nvidia_request_timeout_seconds: int = 60
+    nvidia_request_timeout_seconds: int = 300
 
     # ── Database ────────────────────────────────────────────────────────
     database_url: str  # required — async driver, e.g. postgresql+asyncpg://...
