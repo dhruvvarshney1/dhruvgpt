@@ -36,6 +36,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+router = APIRouter(tags=["chat"])
+
 @router.get("/models")
 async def get_models() -> list[str]:
     """Return available models configured in backend settings."""
