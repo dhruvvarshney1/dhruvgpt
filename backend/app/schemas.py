@@ -38,6 +38,7 @@ class ChatRequest(BaseModel):
 
     conversation_id: uuid.UUID | None = None
     message: str = Field(..., min_length=1)
+    model: str | None = None  # ponytail: optional override, backend default if omitted
 
 
 class ConversationCreateResponse(BaseModel):

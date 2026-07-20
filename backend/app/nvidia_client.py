@@ -60,6 +60,7 @@ _BASE_DELAY_S = 1.0
 async def stream_chat_completion(
     messages: list[dict[str, str]],
     *,
+    model: str | None = None,
     usage_out: dict[str, Any] | None = None,
 ) -> AsyncGenerator[str, None]:
     """Stream incremental text from NVIDIA's chat completions endpoint.
@@ -68,6 +69,7 @@ async def stream_chat_completion(
 
     Args:
         messages: OpenAI-format list of ``{"role": ..., "content": ...}`` dicts.
+        model: Optional model override. Uses ``settings.nvidia_model`` if None.
         usage_out: Optional mutable dict. After the generator is fully consumed,
             this dict will be populated with token-usage data (if the API
             returned it), e.g. ``{"prompt_tokens": 10, ...}``.
@@ -83,7 +85,7 @@ async def stream_chat_completion(
         "Accept": "text/event-stream",
     }
     payload = {
-        "model": settings.nvidia_model,
+        "model": model or settings.nvidia_model,
         "messages": messages,
         "temperature": settings.nvidia_temperature,
         "max_tokens": settings.nvidia_max_tokens,

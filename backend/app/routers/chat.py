@@ -130,7 +130,7 @@ async def chat(
 
         try:
             async for chunk in stream_chat_completion(
-                nvidia_messages, usage_out=usage,
+                nvidia_messages, model=request.model, usage_out=usage,
             ):
                 full_text_parts.append(chunk)
                 yield _sse("token", chunk)

@@ -47,10 +47,20 @@ const emptyState       = document.getElementById("empty-state");
 const chatForm         = document.getElementById("chat-form");
 const messageInput     = document.getElementById("message-input");
 const sendBtn          = document.getElementById("send-btn");
+const modelSelect      = document.getElementById("model-select");
 
 // ── Initialise ─────────────────────────────────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
     loadConversations();
+
+    // ponytail: restore selected model from localStorage
+    const saved = localStorage.getItem("selected_model");
+    if (saved && modelSelect.querySelector(`option[value="${saved}"]`)) {
+        modelSelect.value = saved;
+    }
+    modelSelect.addEventListener("change", () => {
+        localStorage.setItem("selected_model", modelSelect.value);
+    });
 
     chatForm.addEventListener("submit", handleSubmit);
     newChatBtn.addEventListener("click", newChat);
@@ -227,6 +237,7 @@ async function sendMessage(text) {
             body: JSON.stringify({
                 conversation_id: currentConversationId,
                 message: text,
+                model: modelSelect.value,
             }),
         });
 
