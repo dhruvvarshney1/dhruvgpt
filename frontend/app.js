@@ -16,6 +16,14 @@
 //   const API_BASE_URL = "https://your-service-name.onrender.com";
 const API_BASE_URL = "https://dhruvgpt.onrender.com";
 
+// Configure marked with highlight.js
+marked.setOptions({
+    highlight: function(code, lang) {
+        const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+        return hljs.highlight(code, { language }).value;
+    }
+});
+
 // ── State ──────────────────────────────────────────────────────────────────
 let currentConversationId = null;
 let isStreaming = false;
@@ -248,8 +256,7 @@ async function sendMessage(text) {
 
                     case "token":
                         fullText += data;
-                        // Render raw text during streaming (avoid constant markdown parsing)
-                        assistantBubble.textContent = fullText;
+                        assistantBubble.innerHTML = marked.parse(fullText);
                         scrollToBottom();
                         break;
 
@@ -257,6 +264,7 @@ async function sendMessage(text) {
                         // Final markdown render
                         assistantBubble.classList.remove("streaming-cursor");
                         assistantBubble.innerHTML = marked.parse(fullText);
+                        addCopyButtons(assistantBubble);
                         scrollToBottom();
                         if (isNewConversation) {
                             // Poll for the generated title
@@ -277,6 +285,7 @@ async function sendMessage(text) {
                         if (fullText) {
                             // Show partial response + error
                             assistantBubble.innerHTML = marked.parse(fullText);
+                            addCopyButtons(assistantBubble);
                             appendErrorMessage(errorMsg, text);
                         } else {
                             assistantBubble.classList.add("message-error");
@@ -300,14 +309,16 @@ async function sendMessage(text) {
                 assistantBubble.classList.remove("streaming-cursor");
                 if (fullText) {
                     assistantBubble.innerHTML = marked.parse(fullText);
+                    addCopyButtons(assistantBubble);
                 }
             }
         }
 
         // Safety: ensure cursor is removed
         assistantBubble.classList.remove("streaming-cursor");
-        if (fullText && assistantBubble.textContent === fullText) {
+        if (fullText && !assistantBubble.querySelector('.code-block-wrapper')) {
             assistantBubble.innerHTML = marked.parse(fullText);
+            addCopyButtons(assistantBubble);
         }
 
     } catch (err) {
@@ -315,6 +326,7 @@ async function sendMessage(text) {
         assistantBubble.classList.remove("streaming-cursor");
         if (fullText) {
             assistantBubble.innerHTML = marked.parse(fullText);
+            addCopyButtons(assistantBubble);
             appendErrorMessage("Connection error: " + err.message, text);
         } else {
             assistantBubble.classList.add("message-error");
@@ -369,6 +381,7 @@ function appendMessageBubble(role, content, renderMarkdown) {
         // for a personal project but should be sanitised (e.g. DOMPurify) in
         // production to prevent XSS from model output.
         bubble.innerHTML = marked.parse(content);
+        addCopyButtons(bubble);
     } else {
         bubble.textContent = content;
     }
@@ -424,4 +437,29 @@ function setStreaming(streaming) {
     if (!streaming) {
         messageInput.focus();
     }
+}
+
+function addCopyButtons(container) {
+    const preBlocks = container.querySelectorAll('pre');
+    preBlocks.forEach((pre) => {
+        if (pre.parentNode.classList.contains('code-block-wrapper')) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'code-block-wrapper';
+
+        const btn = document.createElement('button');
+        btn.className = 'btn-copy';
+        btn.textContent = 'Copy';
+        btn.onclick = () => {
+            const code = pre.querySelector('code')?.innerText || pre.innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                btn.textContent = 'Copied!';
+                setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+            });
+        };
+
+        pre.parentNode.insertBefore(wrapper, pre);
+        wrapper.appendChild(btn);
+        wrapper.appendChild(pre);
+    });
 }
