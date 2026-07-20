@@ -378,7 +378,7 @@ async function sendMessage(text) {
             appendErrorMessage("Connection error: " + err.message, text);
         } else {
             assistantBubble.classList.add("message-error");
-            assistantBubble.textContent = "⚠ Something went wrong, please try again.";
+            assistantBubble.textContent = "⚠ " + (err.message || "Something went wrong, please try again.");
             const retryBtn = createRetryButton(text, assistantBubble.parentElement);
             assistantBubble.appendChild(retryBtn);
         }
