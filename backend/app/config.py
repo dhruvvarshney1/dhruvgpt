@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     cors_allowed_origins: str | list[str] = [
         "http://localhost:8000",
         "http://127.0.0.1:5500",
+        "https://dhruvvarshney1.github.io",
     ]
 
     @field_validator("cors_allowed_origins", "available_models", mode="before")
