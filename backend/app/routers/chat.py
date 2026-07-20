@@ -47,7 +47,8 @@ async def get_models() -> list[str]:
     return [settings.nvidia_model]
 
 
-@router.post("/chat")
+
+SYSTEM_PROMPT_PATH = Path(__file__).parent.parent.parent / "system.md"
 
 
 def get_system_prompt() -> str:
