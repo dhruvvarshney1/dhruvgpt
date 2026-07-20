@@ -3,11 +3,6 @@
  *
  * Vanilla JS, no build step. Connects to the FastAPI backend for chat
  * streaming and conversation management.
- *
- * Design note: assistant responses are rendered as raw text during streaming
- * (with a blinking cursor), then re-rendered with marked.parse() on the
- * `done` event. This avoids constant markdown re-parsing mid-stream while
- * still producing rich output once complete.
  */
 
 // ── Configuration ──────────────────────────────────────────────────────────
@@ -16,11 +11,24 @@
 //   const API_BASE_URL = "https://your-service-name.onrender.com";
 const API_BASE_URL = "https://dhruvgpt.onrender.com";
 
-// Configure marked with highlight.js
-marked.setOptions({
-    highlight: function(code, lang) {
-        const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-        return hljs.highlight(code, { language }).value;
+// ── Configure marked with highlight.js via the extension API ───────────────
+marked.use({
+    breaks: true, // Convert single \n to <br> for paragraph spacing
+    gfm: true,    // GitHub Flavored Markdown
+    extensions: [],
+    renderer: {
+        code(token) {
+            const lang = (token.lang || '').trim();
+            const text = token.text || '';
+            let highlighted;
+            if (lang && hljs.getLanguage(lang)) {
+                highlighted = hljs.highlight(text, { language: lang }).value;
+            } else {
+                highlighted = hljs.highlightAuto(text).value;
+            }
+            const langLabel = lang || 'code';
+            return `<pre><div class="code-lang-label">${langLabel}</div><code class="hljs language-${langLabel}">${highlighted}</code></pre>`;
+        }
     }
 });
 
@@ -256,12 +264,13 @@ async function sendMessage(text) {
 
                     case "token":
                         fullText += data;
+                        // Live markdown render during streaming
                         assistantBubble.innerHTML = marked.parse(fullText);
                         scrollToBottom();
                         break;
 
                     case "done":
-                        // Final markdown render
+                        // Final markdown render with copy buttons
                         assistantBubble.classList.remove("streaming-cursor");
                         assistantBubble.innerHTML = marked.parse(fullText);
                         addCopyButtons(assistantBubble);
@@ -314,7 +323,7 @@ async function sendMessage(text) {
             }
         }
 
-        // Safety: ensure cursor is removed
+        // Safety: ensure cursor is removed and final render is done
         assistantBubble.classList.remove("streaming-cursor");
         if (fullText && !assistantBubble.querySelector('.code-block-wrapper')) {
             assistantBubble.innerHTML = marked.parse(fullText);
@@ -343,16 +352,21 @@ async function sendMessage(text) {
 // ── SSE frame parser ───────────────────────────────────────────────────────
 function parseSSEFrame(frame) {
     let event = null;
-    let data = null;
+    const dataParts = [];
 
     for (const line of frame.split("\n")) {
         if (line.startsWith("event: ")) {
             event = line.slice(7).trim();
         } else if (line.startsWith("data: ")) {
-            data = line.slice(6);
+            dataParts.push(line.slice(6));
+        } else if (line === "data:") {
+            // Bare "data:" line represents an empty line in multi-line data
+            dataParts.push("");
         }
     }
 
+    // Rejoin multi-line data fields with newlines per the SSE spec
+    const data = dataParts.length > 0 ? dataParts.join("\n") : null;
     return { event, data };
 }
 
@@ -377,9 +391,6 @@ function appendMessageBubble(role, content, renderMarkdown) {
         bubble.textContent = content;
     } else if (renderMarkdown && content) {
         // Completed assistant messages: render markdown
-        // NOTE: marked.js output is used with innerHTML here. This is acceptable
-        // for a personal project but should be sanitised (e.g. DOMPurify) in
-        // production to prevent XSS from model output.
         bubble.innerHTML = marked.parse(content);
         addCopyButtons(bubble);
     } else {
@@ -454,7 +465,11 @@ function addCopyButtons(container) {
             const code = pre.querySelector('code')?.innerText || pre.innerText;
             navigator.clipboard.writeText(code).then(() => {
                 btn.textContent = 'Copied!';
-                setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 2000);
             });
         };
 

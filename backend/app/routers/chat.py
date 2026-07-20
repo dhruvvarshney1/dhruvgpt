@@ -54,8 +54,14 @@ def get_system_prompt() -> str:
 
 
 def _sse(event: str, data: str) -> str:
-    """Format a single SSE frame."""
-    return f"event: {event}\ndata: {data}\n\n"
+    """Format a single SSE frame.
+
+    Per the SSE spec, multi-line data must be split so each line
+    gets its own ``data: `` prefix.
+    """
+    lines = data.split("\n")
+    data_section = "\n".join(f"data: {line}" for line in lines)
+    return f"event: {event}\n{data_section}\n\n"
 
 
 async def generate_title(conversation_id: uuid.UUID, first_user_message: str) -> None:
