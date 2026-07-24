@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     nvidia_api_key: str  # required — no default
     nvidia_api_base_url: str = "https://integrate.api.nvidia.com/v1"
     nvidia_model: str = "meta/llama-3.1-8b-instruct"
-    available_models: list[str] = [
+    available_models: str | list[str] = [
         "meta/llama-3.1-8b-instruct",
         "meta/llama-3.1-70b-instruct",
         "meta/llama-3.3-70b-instruct",
@@ -58,7 +58,9 @@ class Settings(BaseSettings):
                 return []
             if v_str.startswith("[") and v_str.endswith("]"):
                 try:
-                    return json.loads(v_str)
+                    res = json.loads(v_str)
+                    if isinstance(res, list):
+                        return [str(item).strip(" '\"`") for item in res if str(item).strip(" '\"`")]
                 except Exception:
                     v_str = v_str[1:-1].strip()
             return [i.strip(" '\"`") for i in v_str.split(",") if i.strip(" '\"`")]
