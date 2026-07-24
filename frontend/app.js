@@ -36,6 +36,8 @@ marked.use({
 let currentConversationId = null;
 let isStreaming = false;
 let userHasScrolledUp = false;
+let activeRequest = null;
+let renderFrame = 0;
 
 // ── DOM references ─────────────────────────────────────────────────────────
 const sidebar          = document.getElementById("sidebar");
@@ -231,6 +233,10 @@ function highlightActiveConversation() {
 // ── Chat form submit ───────────────────────────────────────────────────────
 function handleSubmit(e) {
     e.preventDefault();
+    if (isStreaming) {
+        activeRequest?.abort();
+        return;
+    }
     const text = messageInput.value.trim();
     if (!text || isStreaming) return;
     sendMessage(text);
@@ -253,10 +259,12 @@ async function sendMessage(text) {
     // Disable input while streaming
     setStreaming(true);
 
-    // Create assistant bubble placeholder
-    const assistantBubble = appendMessageBubble("assistant", "", false);
-    assistantBubble.classList.add("streaming-cursor");
+    // Keep reasoning and answer separate; neither is inferred by the client.
+    const assistant = appendAssistantStream();
     let fullText = "";
+    let reasoningText = "";
+    let streamEnded = false;
+    activeRequest = new AbortController();
 
     try {
         const res = await fetch(`${API_BASE_URL}/chat`, {
@@ -267,6 +275,7 @@ async function sendMessage(text) {
                 message: text,
                 model: modelSelect.value,
             }),
+            signal: activeRequest.signal,
         });
 
         if (!res.ok) {
@@ -275,6 +284,7 @@ async function sendMessage(text) {
         }
 
         // Read the SSE stream via ReadableStream
+        if (!res.body) throw new Error("Streaming is not supported by this browser.");
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -302,17 +312,17 @@ async function sendMessage(text) {
                         break;
 
                     case "token":
-                        fullText += data;
-                        // Live markdown render during streaming
-                        assistantBubble.innerHTML = marked.parse(fullText);
-                        scrollToBottom();
+                        fullText += data || "";
+                        scheduleStreamRender(assistant, fullText, reasoningText);
+                        break;
+                    case "reasoning":
+                        reasoningText += data || "";
+                        scheduleStreamRender(assistant, fullText, reasoningText);
                         break;
 
                     case "done":
-                        // Final markdown render with copy buttons
-                        assistantBubble.classList.remove("streaming-cursor");
-                        assistantBubble.innerHTML = marked.parse(fullText);
-                        addCopyButtons(assistantBubble);
+                        streamEnded = true;
+                        renderStream(assistant, fullText, reasoningText, false);
                         scrollToBottom();
                         if (isNewConversation) {
                             // Poll for the generated title
@@ -322,7 +332,6 @@ async function sendMessage(text) {
                         break;
 
                     case "error":
-                        assistantBubble.classList.remove("streaming-cursor");
                         let errorMsg;
                         try {
                             const errData = JSON.parse(data);
@@ -331,15 +340,10 @@ async function sendMessage(text) {
                             errorMsg = data;
                         }
                         if (fullText) {
-                            // Show partial response + error
-                            assistantBubble.innerHTML = marked.parse(fullText);
-                            addCopyButtons(assistantBubble);
+                            renderStream(assistant, fullText, reasoningText, false);
                             appendErrorMessage(errorMsg, text);
                         } else {
-                            assistantBubble.classList.add("message-error");
-                            assistantBubble.textContent = "⚠ " + errorMsg;
-                            const retryBtn = createRetryButton(text, assistantBubble.parentElement);
-                            assistantBubble.appendChild(retryBtn);
+                            showStreamError(assistant, errorMsg, text);
                         }
                         scrollToBottom();
                         break;
@@ -350,42 +354,84 @@ async function sendMessage(text) {
         // Handle any remaining buffer
         if (buffer.trim()) {
             const { event, data } = parseSSEFrame(buffer);
-            if (event === "token") {
-                fullText += data;
-            }
+            if (event === "token") fullText += data || "";
+            if (event === "reasoning") reasoningText += data || "";
             if (event === "done" || !event) {
-                assistantBubble.classList.remove("streaming-cursor");
-                if (fullText) {
-                    assistantBubble.innerHTML = marked.parse(fullText);
-                    addCopyButtons(assistantBubble);
-                }
+                streamEnded = event === "done";
+                renderStream(assistant, fullText, reasoningText, false);
             }
         }
 
-        // Safety: ensure cursor is removed and final render is done
-        assistantBubble.classList.remove("streaming-cursor");
-        if (fullText && !assistantBubble.querySelector('.code-block-wrapper')) {
-            assistantBubble.innerHTML = marked.parse(fullText);
-            addCopyButtons(assistantBubble);
-        }
+        renderStream(assistant, fullText, reasoningText, !streamEnded && !activeRequest.signal.aborted);
 
     } catch (err) {
-        console.error("Chat error:", err);
-        assistantBubble.classList.remove("streaming-cursor");
-        if (fullText) {
-            assistantBubble.innerHTML = marked.parse(fullText);
-            addCopyButtons(assistantBubble);
-            appendErrorMessage("Connection error: " + err.message, text);
+        if (err.name === "AbortError") {
+            renderStream(assistant, fullText, reasoningText, false);
+            if (fullText) appendErrorMessage("Stopped — partial output preserved.", text);
         } else {
-            assistantBubble.classList.add("message-error");
-            assistantBubble.textContent = "⚠ " + (err.message || "Something went wrong, please try again.");
-            const retryBtn = createRetryButton(text, assistantBubble.parentElement);
-            assistantBubble.appendChild(retryBtn);
+            console.error("Chat error:", err);
+            renderStream(assistant, fullText, reasoningText, false);
+            if (fullText) appendErrorMessage("Connection error: " + err.message, text);
+            else showStreamError(assistant, err.message || "Something went wrong.", text);
         }
     } finally {
+        activeRequest = null;
         setStreaming(false);
-        scrollToBottom();
+        if (!userHasScrolledUp) forceScrollToBottom();
     }
+}
+
+function appendAssistantStream() {
+    const row = document.createElement("div");
+    row.className = "message-row assistant";
+    const panel = document.createElement("details");
+    panel.className = "reasoning-panel";
+    panel.hidden = true;
+    panel.innerHTML = '<summary>Reasoning</summary><div class="reasoning-content"></div>';
+    const bubble = document.createElement("div");
+    bubble.className = "message-bubble streaming-cursor thinking";
+    bubble.textContent = "Thinking";
+    row.append(panel, bubble);
+    messagesContainer.appendChild(row);
+    return { row, panel, reasoning: panel.querySelector(".reasoning-content"), bubble };
+}
+
+function scheduleStreamRender(view, answer, reasoning) {
+    if (renderFrame) return;
+    renderFrame = requestAnimationFrame(() => {
+        renderFrame = 0;
+        renderStream(view, answer, reasoning, true);
+    });
+}
+
+function renderStream(view, answer, reasoning, streaming) {
+    if (!streaming && renderFrame) {
+        cancelAnimationFrame(renderFrame);
+        renderFrame = 0;
+    }
+    if (reasoning) {
+        view.panel.hidden = false;
+        view.reasoning.innerHTML = safeMarkdown(reasoning);
+    }
+    view.bubble.classList.toggle("streaming-cursor", streaming);
+    view.bubble.classList.toggle("thinking", !answer && streaming);
+    if (answer) {
+        view.bubble.innerHTML = safeMarkdown(answer);
+        if (!streaming) addCopyButtons(view.bubble);
+    } else if (!streaming) view.bubble.textContent = reasoning ? "" : "No response received.";
+    if (streaming) scrollToBottom();
+}
+
+function safeMarkdown(text) {
+    const html = marked.parse(text || "", { async: false });
+    return window.DOMPurify ? DOMPurify.sanitize(html) : html.replace(/<script[\s\S]*?<\/script>/gi, "");
+}
+
+function showStreamError(view, message, retryText) {
+    view.bubble.classList.remove("streaming-cursor", "thinking");
+    view.bubble.classList.add("message-error");
+    view.bubble.textContent = "⚠ " + message;
+    view.bubble.appendChild(createRetryButton(retryText, view.row));
 }
 
 // ── SSE frame parser ───────────────────────────────────────────────────────
@@ -430,7 +476,7 @@ function appendMessageBubble(role, content, renderMarkdown) {
         bubble.textContent = content;
     } else if (renderMarkdown && content) {
         // Completed assistant messages: render markdown
-        bubble.innerHTML = marked.parse(content);
+        bubble.innerHTML = safeMarkdown(content);
         addCopyButtons(bubble);
     } else {
         bubble.textContent = content;
@@ -482,8 +528,13 @@ function forceScrollToBottom() {
 
 function setStreaming(streaming) {
     isStreaming = streaming;
-    sendBtn.disabled = streaming;
     messageInput.disabled = streaming;
+    sendBtn.disabled = false;
+    sendBtn.title = streaming ? "Stop response" : "Send message";
+    sendBtn.setAttribute("aria-label", streaming ? "Stop response" : "Send");
+    sendBtn.innerHTML = streaming
+        ? '<span class="stop-icon" aria-hidden="true"></span>'
+        : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
     if (!streaming) {
         messageInput.focus();
     }

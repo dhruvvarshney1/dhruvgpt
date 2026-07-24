@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+import asyncio
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -142,8 +143,17 @@ async def chat(
             async for chunk in stream_chat_completion(
                 nvidia_messages, model=request.model, usage_out=usage,
             ):
-                full_text_parts.append(chunk)
-                yield _sse("token", chunk)
+                if chunk.kind == "token":
+                    full_text_parts.append(chunk.text)
+                yield _sse(chunk.kind, chunk.text)
+        except asyncio.CancelledError:
+            # The generator's cleanup below still persists partial output.
+            full_text = "".join(full_text_parts)
+            if full_text:
+                await crud.add_message(db, conversation_id, role="assistant", content=full_text,
+                                        token_count=usage.get("completion_tokens"))
+            errored = True
+            raise
         except NvidiaRateLimitError as exc:
             errored = True
             logger.error("NVIDIA rate limit: %s", exc)

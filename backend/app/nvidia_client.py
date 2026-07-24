@@ -18,10 +18,19 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import httpx
+from dataclasses import dataclass
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class StreamChunk:
+    """Provider-neutral streamed content."""
+
+    kind: str
+    text: str
 
 # ── Exceptions ──────────────────────────────────────────────────────────────
 
@@ -62,7 +71,7 @@ async def stream_chat_completion(
     *,
     model: str | None = None,
     usage_out: dict[str, Any] | None = None,
-) -> AsyncGenerator[str, None]:
+) -> AsyncGenerator[StreamChunk, None]:
     """Stream incremental text from NVIDIA's chat completions endpoint.
 
     Yields only the ``delta.content`` text fragments as they arrive.
@@ -160,9 +169,12 @@ async def stream_chat_completion(
                         if not choices:
                             continue
                         delta = choices[0].get("delta", {})
+                        reasoning = delta.get("reasoning_content") or delta.get("reasoning")
+                        if reasoning:
+                            yield StreamChunk("reasoning", reasoning)
                         content = delta.get("content")
                         if content:
-                            yield content
+                            yield StreamChunk("token", content)
 
                     # Stream ended without [DONE] — still success
                     return
@@ -214,5 +226,6 @@ async def get_full_completion(
     """
     parts: list[str] = []
     async for chunk in stream_chat_completion(messages, usage_out=usage_out):
-        parts.append(chunk)
+        if chunk.kind == "token":
+            parts.append(chunk.text)
     return "".join(parts)

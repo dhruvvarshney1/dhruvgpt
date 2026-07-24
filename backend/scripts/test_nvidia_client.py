@@ -27,7 +27,7 @@ async def main() -> None:
     print("=== Streaming test ===")
     usage: dict = {}
     async for chunk in stream_chat_completion(test_messages, usage_out=usage):
-        print(chunk, end="", flush=True)
+        print(chunk.text, end="", flush=True)
     print("\n")
 
     if usage:
